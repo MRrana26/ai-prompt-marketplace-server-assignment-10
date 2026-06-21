@@ -39,6 +39,15 @@ async function run() {
       res.send(result);
     })
 
+    app.get("/api/prompts", async (req, res) => {
+      try {
+        const result = await promptCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to fetch prompts" });
+      }
+    });
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
