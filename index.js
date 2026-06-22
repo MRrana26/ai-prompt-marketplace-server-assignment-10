@@ -33,18 +33,38 @@ async function run() {
     const database = client.db("prompt_verse");
     const promptCollection = database.collection("prompts");
 
-    app.post("/api/prompts", async(req, res )=> {
+    app.post("/api/prompts", async (req, res) => {
       const prompt = req.body;
       const result = await promptCollection.insertOne(prompt);
       res.send(result);
-    })
+    });
 
-    app.get("/api/prompts", async (req, res) => {
+
+    app.get('/api/creator-prompts', async (req, res) => {
       try {
-        const result = await promptCollection.find().toArray();
+        const email = req.query.email;
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+        const query = { creatorEmail: email };
+        const result = await promptCollection.find(query).toArray();
         res.send(result);
       } catch (error) {
-        res.status(500).send({ message: "Failed to fetch prompts" });
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.get('/api/user-prompts', async (req, res) => {
+      try {
+        const email = req.query.email;
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+        const query = { userEmail: email };
+        const result = await promptCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
       }
     });
 
