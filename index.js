@@ -4,6 +4,10 @@ const app = express()
 const port = 5000
 require('dotenv').config();
 
+const Stripe = require('stripe');
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+
 app.use(cors());
 app.use(express.json());
 
@@ -33,6 +37,7 @@ async function run() {
     const database = client.db("prompt_verse");
     const promptCollection = database.collection("prompts");
     const userCollection = database.collection("user");
+    const paymentCollection = database.collection("payments");
 
     app.post("/api/prompts", async (req, res) => {
       const prompt = req.body;
@@ -158,6 +163,81 @@ async function run() {
           totalCopies: totalCopiesAgg[0]?.total || 0,
           engineStats: engineAgg,
         });
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
+    // =================== featured api ====================
+    app.get('/api/featured-prompts', async (req, res) => {
+      try {
+        const result = await promptCollection
+          .find({ status: "approved", visibilityStatus: "Public" })
+          .sort({ copyCount: -1 })
+          .limit(6)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
+
+
+    // ========================= api id details ===================
+    app.get('/api/prompts/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await promptCollection.findOne({ _id: new ObjectId(id) });
+        if (!result) return res.status(404).send({ message: "Prompt not found" });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
+
+
+    // ============================ payments ==============
+    app.post('/api/create-payment-intent', async (req, res) => {
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: 500,
+          currency: 'usd',
+        });
+        res.send({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).send({ message: "Payment error", error: error.message });
+      }
+    });
+
+    app.post('/api/payment-success', async (req, res) => {
+      try {
+        const { email, transactionId, amount } = req.body;
+        const payment = {
+          email,
+          transactionId,
+          amount,
+          createdAt: new Date().toISOString(),
+        };
+        await paymentCollection.insertOne(payment);
+        await userCollection.updateOne(
+          { email },
+          { $set: { plan: "premium" } }
+        );
+        res.send({ success: true });
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.get('/api/admin/payments', async (req, res) => {
+      try {
+        const result = await paymentCollection.find().sort({ createdAt: -1 }).toArray();
+        res.send(result);
       } catch (error) {
         res.status(500).send({ message: "Server error", error: error.message });
       }
