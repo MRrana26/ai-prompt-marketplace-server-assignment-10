@@ -139,6 +139,31 @@ async function run() {
     // =============== all prompts ==========
 
 
+    // =============== all stats ==========
+    app.get('/api/admin/stats', async (req, res) => {
+      try {
+        const totalUsers = await userCollection.countDocuments();
+        const totalPrompts = await promptCollection.countDocuments();
+        const totalCopiesAgg = await promptCollection.aggregate([
+          { $group: { _id: null, total: { $sum: "$copyCount" } } }
+        ]).toArray();
+
+        const engineAgg = await promptCollection.aggregate([
+          { $group: { _id: "$aiEngine", prompts: { $sum: 1 }, copies: { $sum: "$copyCount" } } }
+        ]).toArray();
+
+        res.send({
+          totalUsers,
+          totalPrompts,
+          totalCopies: totalCopiesAgg[0]?.total || 0,
+          engineStats: engineAgg,
+        });
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
