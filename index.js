@@ -7,7 +7,7 @@ require('dotenv').config();
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId  } = require('mongodb');
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
@@ -32,6 +32,7 @@ async function run() {
 
     const database = client.db("prompt_verse");
     const promptCollection = database.collection("prompts");
+    const userCollection = database.collection("user");
 
     app.post("/api/prompts", async (req, res) => {
       const prompt = req.body;
@@ -62,6 +63,40 @@ async function run() {
         }
         const query = { userEmail: email };
         const result = await promptCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    // ============ admin ===============
+    app.get('/api/admin/users', async (req, res) => {
+      try {
+        const result = await userCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.patch('/api/admin/users/:id/role', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { role } = req.body;
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { role } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.delete('/api/admin/users/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
         res.send(result);
       } catch (error) {
         res.status(500).send({ message: "Server error", error: error.message });
