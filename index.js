@@ -7,7 +7,7 @@ require('dotenv').config();
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion, ObjectId  } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
@@ -102,6 +102,41 @@ async function run() {
         res.status(500).send({ message: "Server error", error: error.message });
       }
     });
+
+    // =============== all prompts ==========
+    app.get('/api/admin/prompts', async (req, res) => {
+      try {
+        const result = await promptCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.patch('/api/admin/prompts/:id/status', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const result = await promptCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.delete('/api/admin/prompts/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await promptCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+    // =============== all prompts ==========
 
 
     // Send a ping to confirm a successful connection
