@@ -424,6 +424,22 @@ async function run() {
       }
     });
 
+    app.get('/api/reviews/:userEmail', async (req, res) => {
+      try {
+        const { userEmail } = req.params;
+        const reviews = await reviewCollection.find({ email: userEmail }).sort({ createdAt: -1 }).toArray();
+        const reviewsWithPrompts = await Promise.all(
+          reviews.map(async (review) => {
+            const prompt = await promptCollection.findOne({ _id: new ObjectId(review.promptId) });
+            return { ...review, promptDetails: prompt || null };
+          })
+        );
+        res.send(reviewsWithPrompts);
+      } catch (error) {
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
