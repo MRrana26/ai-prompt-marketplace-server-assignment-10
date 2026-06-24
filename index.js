@@ -7,7 +7,6 @@ require('dotenv').config();
 const Stripe = require('stripe');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-
 app.use(cors());
 app.use(express.json());
 
@@ -16,7 +15,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })
-
 
 const uri = process.env.MONGODB_URI;
 
@@ -51,7 +49,6 @@ app.post("/api/prompts", async (req, res) => {
   const result = await promptCollection.insertOne(prompt);
   res.send(result);
 });
-
 
 app.get('/api/creator-prompts', async (req, res) => {
   try {
@@ -150,7 +147,6 @@ app.delete('/api/admin/prompts/:id', async (req, res) => {
 });
 // =============== all prompts ==========
 
-
 // =============== all stats ==========
 app.get('/api/admin/stats', async (req, res) => {
   try {
@@ -164,17 +160,24 @@ app.get('/api/admin/stats', async (req, res) => {
       { $group: { _id: "$aiEngine", prompts: { $sum: 1 }, copies: { $sum: "$copyCount" } } }
     ]).toArray();
 
+    const totalReviews = await reviewCollection.countDocuments();
+    const totalRevenue = await paymentCollection.aggregate([
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]).toArray();
+
     res.send({
       totalUsers,
       totalPrompts,
       totalCopies: totalCopiesAgg[0]?.total || 0,
+      totalReviews,
+      totalRevenue: totalRevenue[0]?.total || 0,
       engineStats: engineAgg,
     });
+
   } catch (error) {
     res.status(500).send({ message: "Server error", error: error.message });
   }
 });
-
 
 // =================== featured api ====================
 app.get('/api/featured-prompts', async (req, res) => {
@@ -190,9 +193,6 @@ app.get('/api/featured-prompts', async (req, res) => {
   }
 });
 
-
-
-
 // ========================= api id details ===================
 app.get('/api/prompts/:id', async (req, res) => {
   try {
@@ -204,9 +204,6 @@ app.get('/api/prompts/:id', async (req, res) => {
     res.status(500).send({ message: "Server error", error: error.message });
   }
 });
-
-
-
 
 // ============================ payments ==============
 app.post('/api/create-payment-intent', async (req, res) => {
@@ -249,9 +246,6 @@ app.get('/api/admin/payments', async (req, res) => {
     res.status(500).send({ message: "Server error", error: error.message });
   }
 });
-
-
-
 
 app.patch('/api/prompts/:id/copy', async (req, res) => {
   try {
@@ -310,7 +304,6 @@ app.get('/api/bookmarks/:userEmail/:promptId', async (req, res) => {
   }
 });
 
-
 // ========================= get api reports ============================
 app.get('/api/admin/reports', async (req, res) => {
   try {
@@ -363,7 +356,6 @@ app.delete('/api/admin/reports/:id', async (req, res) => {
   }
 });
 
-
 app.delete('/api/admin/prompts/:promptId/report/:reportId', async (req, res) => {
   try {
     const { promptId, reportId } = req.params;
@@ -414,8 +406,6 @@ app.get('/api/prompts/:id/reviews', async (req, res) => {
   }
 });
 
-
-
 app.get('/api/bookmarks/:userEmail', async (req, res) => {
   try {
     const { userEmail } = req.params;
@@ -444,8 +434,6 @@ app.get('/api/reviews/:userEmail', async (req, res) => {
   }
 });
 
-
-
 app.put('/api/prompts/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -471,7 +459,6 @@ app.delete('/api/prompts/:id', async (req, res) => {
   }
 });
 
-
 app.get('/api/prompts/:id/analytics', async (req, res) => {
   try {
     const { id } = req.params;
@@ -491,7 +478,26 @@ app.get('/api/reviews', async (req, res) => {
   } catch (error) {
     res.status(500).send({ message: "Server error", error: error.message });
   }
+});
 
+app.get('/api/top-creators', async (req, res) => {
+  try {
+    const result = await promptCollection.aggregate([
+      { $match: { status: "approved" } },
+      {
+        $group: {
+          _id: "$creatorEmail",
+          totalPrompts: { $sum: 1 },
+          totalCopies: { $sum: "$copyCount" }
+        }
+      },
+      { $sort: { totalCopies: -1 } },
+      { $limit: 4 }
+    ]).toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error: error.message });
+  }
 });
 
 // Send a ping to confirm a successful connection
@@ -504,11 +510,8 @@ app.get('/api/reviews', async (req, res) => {
 // }
 // run().catch(console.dir);
 
-
-
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
-
 
 module.exports = app;
